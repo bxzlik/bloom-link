@@ -19,55 +19,61 @@ body{
   overflow:hidden;
 }
 
-.bg-particles{
+/* фоновая надпись BLOOM — во всю ширину экрана, еле видная */
+.wordmark{
   position:fixed;
   inset:0;
-  width:100%;
-  height:100%;
+  z-index:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
   pointer-events:none;
+  user-select:none;
+  -webkit-user-select:none;
+}
+.wordmark svg{
+  display:block;
+  width:100%;
+  height:auto;
+}
+.wordmark text{
+  font-family:inherit;
+  font-weight:900;
+  letter-spacing:-.02em;
+  fill:rgba(255,255,255,.028);
 }
 
 .cursor{
   position:fixed;
   top:0;
   left:0;
-  width:8px;
-  height:8px;
-  border-radius:50%;
-  background:rgba(255,255,255,.92);
+  width:30px;
+  height:30px;
   pointer-events:none;
   z-index:3;
   opacity:0;
   transform:translate3d(-50%,-50%,0);
-  transition:width .18s ease,height .18s ease,opacity .18s ease,background-color .18s ease;
+  transition:opacity .18s ease;
+  will-change:transform;
 }
 
-.cursor::after{
-  content:"";
-  position:absolute;
-  inset:50% auto auto 50%;
-  width:32px;
-  height:32px;
-  border:1.5px solid rgba(255,255,255,.24);
-  border-radius:50%;
-  transform:translate(-50%,-50%);
-  transition:width .2s ease,height .2s ease,border-color .2s ease,opacity .2s ease;
+.cursor img{
+  display:block;
+  width:100%;
+  height:100%;
+  object-fit:contain;
+  opacity:.9;
+  transform-origin:center center;
+  transition:transform .2s cubic-bezier(.18,.8,.22,1),opacity .18s ease;
 }
 
 .cursor.is-visible{
   opacity:1;
 }
 
-.cursor.is-hover{
-  width:10px;
-  height:10px;
-  background:rgba(255,255,255,1);
-}
-
-.cursor.is-hover::after{
-  width:42px;
-  height:42px;
-  border-color:rgba(255,255,255,.36);
+.cursor.is-hover img{
+  transform:scale(1.25);
+  opacity:1;
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -225,8 +231,13 @@ body{
 </style>
 </head>
 <body>
-<canvas class="bg-particles" id="bgParticles"></canvas>
-<div class="cursor" id="cursor"></div>
+<div class="wordmark" aria-hidden="true">
+  <svg viewBox="0 0 1000 560" preserveAspectRatio="xMidYMid meet">
+    <text x="500" y="449" text-anchor="middle" font-size="470"
+          textLength="1000" lengthAdjust="spacingAndGlyphs">BLOOM</text>
+  </svg>
+</div>
+<div class="cursor" id="cursor"><img src="logo.png" alt=""></div>
 <div class="card">
   <div class="card-header">
     <div class="card-avatar">
@@ -263,21 +274,10 @@ body{
 
 <script>
 (function(){
-  var canvas = document.getElementById('bgParticles');
-  var ctx = canvas.getContext('2d');
   var customCursor = document.getElementById('cursor');
   var card = document.querySelector('.card');
-  var particles = [];
-  var pointer = {
-    active: false,
-    x: 0,
-    y: 0,
-    radius: 140
-  };
   var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
   var finePointer = window.matchMedia('(hover: hover) and (pointer: fine)');
-  var particleCount = 34;
-  var rafId = 0;
   var cursorRafId = 0;
   var cardRafId = 0;
   var cursorEnabled = false;
@@ -287,83 +287,6 @@ body{
   var cardTilt = { x: 0, y: 0 };
   var cardVisible = false;
   var maxTilt = 1.6;
-
-  function resizeCanvas() {
-    var dpr = Math.min(window.devicePixelRatio || 1, 2);
-    canvas.width = Math.floor(window.innerWidth * dpr);
-    canvas.height = Math.floor(window.innerHeight * dpr);
-    canvas.style.width = window.innerWidth + 'px';
-    canvas.style.height = window.innerHeight + 'px';
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    createParticles();
-  }
-
-  function randomBetween(min, max) {
-    return min + Math.random() * (max - min);
-  }
-
-  function createParticles() {
-    particles = [];
-    for (var i = 0; i < particleCount; i++) {
-      particles.push({
-        x: Math.random() * window.innerWidth,
-        y: Math.random() * window.innerHeight,
-        vx: randomBetween(-0.08, 0.08),
-        vy: randomBetween(-0.08, 0.08),
-        size: randomBetween(0.8, 2.2),
-        alpha: randomBetween(0.14, 0.34)
-      });
-    }
-  }
-
-  function updateParticles() {
-    ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
-
-    for (var i = 0; i < particles.length; i++) {
-      var dot = particles[i];
-      dot.x += dot.vx;
-      dot.y += dot.vy;
-
-      if (dot.x < -20) dot.x = window.innerWidth + 20;
-      if (dot.x > window.innerWidth + 20) dot.x = -20;
-      if (dot.y < -20) dot.y = window.innerHeight + 20;
-      if (dot.y > window.innerHeight + 20) dot.y = -20;
-
-      if (pointer.active) {
-        var dx = dot.x - pointer.x;
-        var dy = dot.y - pointer.y;
-        var distance = Math.sqrt(dx * dx + dy * dy) || 1;
-
-        if (distance < pointer.radius) {
-          var force = (pointer.radius - distance) / pointer.radius;
-          dot.x += (dx / distance) * force * 0.9;
-          dot.y += (dy / distance) * force * 0.9;
-        }
-      }
-
-      ctx.beginPath();
-      ctx.arc(dot.x, dot.y, dot.size, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(255,255,255,' + dot.alpha + ')';
-      ctx.fill();
-    }
-
-    rafId = window.requestAnimationFrame(updateParticles);
-  }
-
-  function startParticles() {
-    resizeCanvas();
-    if (!reduceMotion.matches) {
-      updateParticles();
-    }
-  }
-
-  function stopParticles() {
-    if (rafId) {
-      window.cancelAnimationFrame(rafId);
-      rafId = 0;
-    }
-    ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
-  }
 
   function renderCursor() {
     cursorCurrent.x += (cursorTarget.x - cursorCurrent.x) * 0.22;
@@ -420,7 +343,8 @@ body{
     if (cursorEnabled) return;
     cursorEnabled = true;
     document.body.classList.add('cursor-enabled');
-    customCursor.classList.add('is-visible');
+    // показываем логотип только после первого движения мыши,
+    // иначе он висит по центру экрана при загрузке
     cursorRafId = window.requestAnimationFrame(renderCursor);
   }
 
@@ -445,11 +369,7 @@ body{
     }
   }
 
-  window.addEventListener('resize', resizeCanvas);
   window.addEventListener('mousemove', function(event) {
-    pointer.active = true;
-    pointer.x = event.clientX;
-    pointer.y = event.clientY;
     cursorTarget.x = event.clientX;
     cursorTarget.y = event.clientY;
     if (cursorEnabled) {
@@ -457,13 +377,11 @@ body{
     }
   });
   window.addEventListener('mouseleave', function() {
-    pointer.active = false;
     customCursor.classList.remove('is-visible');
     cardPointer.x = 0;
     cardPointer.y = 0;
   });
   window.addEventListener('touchstart', function() {
-    pointer.active = false;
     stopCursor();
   }, { passive: true });
 
@@ -494,20 +412,14 @@ body{
   if (typeof reduceMotion.addEventListener === 'function') {
     reduceMotion.addEventListener('change', function(event) {
       if (event.matches) {
-        stopParticles();
-        resizeCanvas();
         stopCardTilt();
-      } else {
-        startParticles();
-        if (finePointer.matches) {
-          startCardTilt();
-        }
+      } else if (finePointer.matches) {
+        startCardTilt();
       }
       applyCardTransform();
     });
   }
 
-  startParticles();
   syncCursorMode();
   applyCardTransform();
   revealCard();
